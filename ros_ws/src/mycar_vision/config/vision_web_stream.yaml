@@ -1,0 +1,25 @@
+# Browser display for the annotated vision stream (no Qt).
+#
+#   ros2 run mycar_vision vision_web_stream --ros-args --params-file <this file>
+#   then open http://<machine-ip>:8081/
+#
+# This is the zero-dependency fallback for `ros-humble-web-video-server`; both
+# can be used at the same time (different ports).
+vision_web_stream:
+  ros__parameters:
+    # Input: the annotated frames produced by vision_detector.
+    image_topic: /vision/image/compressed
+    # Used for the "objects" counter and the table on the page.
+    detection_topic: /vision/detections
+
+    # 0.0.0.0 accepts connections from other machines (phone / laptop).
+    host: 0.0.0.0
+    port: 8081
+
+    # Cap the MJPEG push rate; the browser is the slowest consumer.
+    fps: 15.0
+
+    # 95+ forwards the incoming JPEG verbatim (no re-encode, lowest CPU).
+    jpeg_quality: 75
+
+    log_interval: 30.0

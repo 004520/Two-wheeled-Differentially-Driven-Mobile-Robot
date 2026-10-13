@@ -1,0 +1,66 @@
+vision_radar_fusion:
+  ros__parameters:
+    detection_topic: "/vision/detections"
+    scan_topic: "/scan"
+    obstacles_topic: "/vision/obstacles"
+
+    # Frames
+    output_frame: "base_link"
+    use_tf: false                 # true -> look up camera_optical_frame -> output_frame
+    camera_optical_frame: "camera_link"
+    tf_timeout: 0.05
+
+    # Pinhole model -- calibrated 2026-10-04 at the camera's NATIVE stream
+    # resolution 800x600 (FRAMESIZE_SVGA, leap_cam/main/camera_init.c), which is
+    # the pixel space /vision/detections bboxes live in.
+    #
+    # Board: 9x6 squares -> 8x5 inner corners, 29.47 mm squares.
+    # Images captured with ~/calib/capture.py (decoded raw frames, all 800x600).
+    # RMS 0.1843 px, mean reprojection error 0.0291 px -> verdict "good".
+    # Sanity check: HFOV = 2*atan(400/fx) = 44.5 deg, (cx, cy) near (400, 300).
+    #
+    # NOTE: this node has no distortion parameters and does not undistort, so
+    # k1=-0.447961 k2=3.191076 p1=0.001769 p2=-0.018750 k3=-10.167437 are NOT
+    # applied.  k1 = -0.45 is large, so bearings away from the frame centre are
+    # biased by the unmodelled distortion -- see README 7.1.1.
+    fx: 977.1961
+    fy: 978.5299
+    cx: 414.7063
+    cy: 281.9281
+
+    enable_mono_depth: true       # monocular fallback when the radar sees nothing
+    mono_depth_classes: ["person", "bottle", "bottle_edge"]
+    publish_without_range: false  # drop detections that have no range at all
+
+    # Radar / lidar window
+    scan_min_range: 0.05
+    scan_max_range: 8.0
+    # Narrowed from 2.0 -> 0.5 deg: the box bearing is already computed from the
+    # box's own left/right edges, so a wide margin only admits unrelated returns
+    # sitting beside the object and biases the nearest-range pick outward.
+    bearing_window_margin_deg: 0.5
+    # "percentile": robust near-range + mean bearing over the window -> unbiased.
+    # "min": argmin(range) and *that bin's own angle*.  A rigid target's front
+    # face is a run of equal returns, so numpy.argmin returns the lowest index
+    # = the object's right edge, biasing the bearing by -half the object's
+    # angular width (bottle @0.5 m -> -3.0 deg, person @2 m -> -6.4 deg).
+    # Prefer "percentile"; "min" is kept only for comparison.
+    range_statistic: "percentile"
+    range_percentile: 20.0
+
+    # Monocular fallback hardening: take the max unclipped box height over the
+    # last 1.5 s so a partial (cap+label) YOLO box does not over-estimate range.
+    mono_use_max_box: true
+    mono_max_box_window_s: 1.5
+
+    target_classes: ["person", "bottle", "bottle_edge", "blue_block", "green_block"]
+    object_heights:
+      - "person:1.65"
+      - "bottle:0.22"
+      - "bottle_edge:0.22"
+      - "blue_block:0.05"
+      - "green_block:0.05"
+
+    log_interval: 10.0
+    stats_interval: 1.0
+    fusion_stats_topic: "/vision/fusion_stats"

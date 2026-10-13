@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>mycar_vision</name>
+  <version>0.0.1</version>
+  <description>
+    Perception-only vision stack for mycar: YOLO11n (person/bottle) plus
+    classical HSV colour segmentation (blue_block/green_block), publishing
+    vision_msgs/Detection2DArray. Downstream radar-fusion, avoidance-decision
+    and Nav2-costmap nodes are provided as extension points.
+  </description>
+  <maintainer email="mycar@todo.todo">mycar</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>vision_msgs</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ros2launch</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+
+  <!--
+    ultralytics (and therefore torch) has no rosdep key. Install it with pip:
+        pip3 install -U ultralytics
+    It provides YOLO11 weights (yolo11n.pt). A copy of yolo11n.pt ships with
+    this package under share/mycar_vision/models so the node works offline.
+  -->
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

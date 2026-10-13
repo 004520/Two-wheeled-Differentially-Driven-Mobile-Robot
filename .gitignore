@@ -1,0 +1,26 @@
+# ===== ROS 2 (colcon) 编译产物 =====
+mycar_ws/build/
+mycar_ws/install/
+mycar_ws/log/
+
+# ===== ESP-IDF 编译产物 =====
+**/build/
+**/managed_components/
+**/sdkconfig
+**/sdkconfig.old
+**/dependencies.lock
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+
+# ===== 编辑器 / OS =====
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# ===== 日志 =====
+*.log

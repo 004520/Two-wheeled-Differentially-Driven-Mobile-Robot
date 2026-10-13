@@ -1,0 +1,19 @@
+vision_to_costmap:
+  ros__parameters:
+    obstacles_topic: "/vision/obstacles"
+    scan_topic: "/vision/obstacles_scan"
+    cloud_topic: "/vision/obstacles_cloud"
+    publish_scan: true
+    publish_cloud: true
+
+    # "" -> reuse the frame of the incoming obstacle array (base_link by default).
+    # Set to "odom" or "map" when feeding the Nav2 global costmap.
+    output_frame: ""
+
+    scan_bins: 720
+    range_min: 0.05
+    range_max: 10.0
+    min_score: 0.0
+
+    target_classes: ["person", "bottle", "bottle_edge", "blue_block", "green_block"]
+    log_interval: 10.0

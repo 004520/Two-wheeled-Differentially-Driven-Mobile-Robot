@@ -1,0 +1,21 @@
+avoidance_decider:
+  ros__parameters:
+    obstacles_topic: "/vision/obstacles"
+    avoidance_topic: "/avoidance_cmd"
+
+    # SAFETY: leave false unless this node is the only cmd_vel owner.
+    enable_cmd_vel: false
+    cmd_vel_topic: ""      # only used when enable_cmd_vel=true
+
+    fov_deg: 70.0
+    min_range: 0.10
+    slow_distance: 0.80
+    stop_distance: 0.35
+    max_linear: 0.15
+    max_angular: 0.80
+    turn_gain: 1.2
+
+    target_classes: ["person", "bottle", "bottle_edge", "blue_block", "green_block"]
+    publish_when_clear: false   # true -> emit a zero Twist when nothing is close
+    stale_timeout: 0.5
+    log_interval: 10.0

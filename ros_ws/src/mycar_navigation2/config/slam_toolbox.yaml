@@ -1,0 +1,114 @@
+# slam_toolbox 配置（在线异步建图）
+#
+# 基线：slam_toolbox 官方 config/mapper_params_online_async.yaml
+# 改动处均带 "CHANGED" 注释，未改动的保持官方默认值。
+#
+# 为什么选异步（async）而不是同步（sync）：
+#   本车雷达 /scan 实测只有约 9 Hz（camsense_lidar.yaml 标称 frequency: 10.0），
+#   且 UDP 转串口链路会有抖动。同步模式在 odometry 回调里逐帧处理 scan，
+#   掉帧/迟到帧会直接拖慢或卡住前端；异步模式把 scan 处理解耦出去，
+#   对低帧率与抖动更宽容。
+#
+# 里程计来源：slam_toolbox **通过 TF 读取 odom -> base_footprint**，
+#   该 TF 由 EKF（ekf_filter_node, publish_tf: true）独占发布，
+#   因此"用 EKF 的 /odometry/filtered"是靠 TF 链路实现的，
+#   slam_toolbox 不需要订阅任何 odom 话题。
+
+slam_toolbox:
+  ros__parameters:
+
+    # ------------------------------------------------------------------
+    # 时钟 / 帧 / 话题
+    # ------------------------------------------------------------------
+    # CHANGED: 官方模板没有这一项。本 launch 独立启动、不经过 nav2_bringup，
+    # 所以不会被引擎递归覆盖，必须自己写死 false（真机用系统时钟）。
+    use_sim_time: false
+
+    odom_frame: odom
+    map_frame: map
+    # CHANGED: 官方是 base_footprint，与 ekf.yaml 的 base_link_frame 一致，保持不变。
+    base_frame: base_footprint
+    scan_topic: /scan
+
+    mode: mapping                # mapping | localization（定位阶段再改）
+    use_map_saver: true          # 允许通过 /slam_toolbox/save_map 服务存图
+
+    # ------------------------------------------------------------------
+    # 解算器（官方默认，未改动）
+    # ------------------------------------------------------------------
+    solver_plugin: solver_plugins::CeresSolver
+    ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
+    ceres_preconditioner: SCHUR_JACOBI
+    ceres_trust_strategy: LEVENBERG_MARQUARDT
+    ceres_dogleg_type: TRADITIONAL_DOGLEG
+    ceres_loss_function: None
+
+    # ------------------------------------------------------------------
+    # 地图
+    # ------------------------------------------------------------------
+    resolution: 0.05             # 与现有 room/jia1 地图一致（0.05 m/px）
+    # CHANGED: 官方 20.0 -> 10.0。雷达 range_max=12.0，但远端回波质量差，
+    # 室内建图限制到 10 m 可少引入噪声；若场地很大再放宽。
+    max_laser_range: 10.0
+    min_laser_range: 0.0
+
+    # ------------------------------------------------------------------
+    # 运行参数（官方默认，未改动）
+    # ------------------------------------------------------------------
+    debug_logging: false
+    throttle_scans: 1
+    transform_publish_period: 0.02   # map -> odom 的发布周期（0 = 不发布）
+    map_update_interval: 5.0
+    minimum_time_interval: 0.5
+    transform_timeout: 0.2
+    tf_buffer_duration: 30.0
+    stack_size_to_use: 40000000
+    enable_interactive_mode: true
+
+    # ------------------------------------------------------------------
+    # 前端 / 回环
+    # ------------------------------------------------------------------
+    use_scan_matching: true
+    use_scan_barycenter: true
+    # CHANGED: 官方 0.5 -> 0.3。小车速度慢（max_vel_x 0.22 m/s）、场景小，
+    # 缩短建图节点间距可以得到更密的图，代价是计算量略增。
+    minimum_travel_distance: 0.3
+    minimum_travel_heading: 0.5      # rad，官方默认
+    scan_buffer_size: 10
+    scan_buffer_maximum_scan_distance: 10.0
+    link_match_minimum_response_fine: 0.1
+    link_scan_maximum_distance: 1.5
+    loop_search_maximum_distance: 3.0
+    do_loop_closing: true
+    loop_match_minimum_chain_size: 10
+    loop_match_maximum_variance_coarse: 3.0
+    loop_match_minimum_response_coarse: 0.35
+    loop_match_minimum_response_fine: 0.45
+
+    # 相关搜索（官方默认）
+    correlation_search_space_dimension: 0.5
+    correlation_search_space_resolution: 0.01
+    correlation_search_space_smear_deviation: 0.1
+
+    loop_search_space_dimension: 8.0
+    loop_search_space_resolution: 0.05
+    loop_search_space_smear_deviation: 0.03
+
+    distance_variance_penalty: 0.5
+    angle_variance_penalty: 1.0
+    fine_search_angle_offset: 0.00349
+    coarse_search_angle_offset: 0.349
+    coarse_angle_resolution: 0.0349
+    minimum_angle_penalty: 0.9
+    minimum_distance_penalty: 0.5
+    use_response_expansion: true
+    min_pass_through: 2
+    occupancy_threshold: 0.1
+
+# ---------------------------------------------------------------------
+# 待实车调（先不要瞎调，跑一次看效果再动）：
+#   minimum_travel_distance  0.3  —— 图太稀/断裂就再调小
+#   max_laser_range          10.0 —— 长走廊若够不着尽头可放宽到 12.0
+#   loop_search_maximum_distance 3.0 —— 小房间够用；大场地要放大
+#   minimum_travel_heading   0.5  —— 原地转圈多就调小
+# ---------------------------------------------------------------------

@@ -1,0 +1,85 @@
+vision_detector:
+  ros__parameters:
+    # --- model ---------------------------------------------------------
+    # Relative names are searched in: model_dir -> share/mycar_vision/models
+    # -> <package>/models -> cwd -> ~/.cache/mycar_vision
+    model: "yolo11n.pt"
+    model_dir: ""
+    # 640 instead of 416: measured on the 2-core CPU, yolo11n@416 needs a
+    # bottle to be ~120-200 px tall before it is seen, yolo11n@640 only
+    # ~80-120 px -- roughly +50 % detection range for 33 -> 69 ms per frame.
+    image_size: 640
+    device: ""          # "" = auto, "cpu" to force CPU
+    # 0.25 (ultralytics default) instead of 0.5: a 0.22 m bottle at 0.7 m already
+    # projects to ~308 px in the 800x600 frame (~246 px at imgsz=640), so size is
+    # NOT the limiting factor -- appearance/contrast is.  A high threshold only
+    # turns an already-marginal class-39 score into a miss.
+    confidence: 0.25
+    iou: 0.45
+
+    # --- topics --------------------------------------------------------
+    image_topic: "/camera/image_raw/compressed"
+    detection_topic: "/vision/detections"
+    annotated_topic: "/vision/image/compressed"
+    annotated_raw_topic: "/vision/image_raw"
+    frame_id: ""        # "" = keep the incoming header.frame_id
+
+    # --- YOLO class ids (COCO) -----------------------------------------
+    person_class_id: 0
+    bottle_class_id: 39
+
+    # --- annotated output ----------------------------------------------
+    publish_annotated: true
+    annotated_quality: 70
+    publish_annotated_raw: false   # true needs a working cv_bridge
+
+    # --- classical colour detection ------------------------------------
+    detect_colored_blocks: true
+    # Add "bottle" to switch on the distant-bottle HSV fallback.  It is off by
+    # default because its hue range has to be calibrated against the real
+    # bottle first (tools/calibrate_bottle_hsv.py); an uncalibrated range
+    # produces false positives.
+    color_classes: ["blue_block", "green_block"]
+    color_min_area: 800
+    color_max_area: 0        # 0 = no upper bound
+    color_min_fill: 0.45     # contour_area / bbox_area, rejects thin noise
+    color_min_solidity: 0.55 # contour_area / hull_area
+    color_morph_kernel: 5
+
+    # --- bottle-label guard --------------------------------------------
+    # green_block boxes that sit inside a YOLO bottle box are dropped
+    bottle_containment_ratio: 0.35
+    bottle_center_margin: 0.10
+
+    # --- distant small-object fallback ---------------------------------
+    # Second YOLO pass over a magnified sub-window, run only when the first
+    # pass found no bottle.  roi_zoom = k magnifies the object k times but the
+    # window then covers only 1/k^2 of the frame, so keep it narrow and
+    # forward looking.  Costs one extra inference whenever it triggers.
+    roi_zoom_enabled: false
+    roi_zoom: 2.0
+    roi_center_x: 0.5           # 0..1, horizontal centre of the window
+    roi_center_y: 0.75          # 0..1, vertical centre (the ground band)
+
+    # --- third layer: outline-only bottle fallback -----------------------
+    # For a colourless transparent bottle: YOLO sees too little contrast and
+    # HSV has no chroma to work with, but the silhouette survives.
+    # Noisiest layer by far (door frames, chair legs and floor seams are all
+    # tall closed contours), so it is off until tuned on the real scene.
+    detect_bottle_edges: false
+    edge_min_area: 200
+    edge_aspect_min: 1.5
+    edge_aspect_max: 4.0
+    edge_min_circularity: 0.3
+    # 20/70 (not 50/150): a colourless bottle on a plain floor is so
+    # low-contrast that 50/150 extracts almost no edge -- measured 0 usable
+    # contours at every distance.  edge_fill floods each enclosed region,
+    # without which Canny's open arcs are slivers the shape filters reject.
+    edge_canny_low: 20
+    edge_canny_high: 70
+    edge_blur: 5
+    edge_close_kernel: 5
+    edge_fill: true
+
+    # --- diagnostics ---------------------------------------------------
+    log_interval: 10.0

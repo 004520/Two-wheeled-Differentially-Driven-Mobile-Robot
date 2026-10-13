@@ -1,0 +1,74 @@
+### ekf config file ###
+ekf_filter_node:
+    ros__parameters:
+# 显式使用系统时钟（与优化项 3 一致，防御性配置）
+        use_sim_time: false
+
+# The frequency, in Hz, at which the filter will output a position estimate. Note that the filter will not begin
+# computation until it receives at least one message from one of theinputs. It will then run continuously at the
+# frequency specified here, regardless of whether it receives more measurements. Defaults to 30 if unspecified.
+        frequency: 50.0
+
+# ekf_localization_node and ukf_localization_node both use a 3D omnidirectional motion model. If this parameter is
+# set to true, no 3D information will be used in your state estimate. Use this if you are operating in a planar
+# environment and want to ignore the effect of small variations in the ground plane that might otherwise be detected
+# by, example, an IMU. Defaults to false if unspecified.
+# 地面小车：强制平面约束（two_d_mode 下 forceTwoD() 会把 3D 分量协方差设为 1e-6）
+        two_d_mode: true
+
+# Whether to publish the acceleration state. Defaults to false if unspecified.
+        publish_acceleration: false
+
+# Whether to broadcast the transformation over the /tf topic. Defaultsto true if unspecified.
+# 由 EKF 独占发布 odom -> base_footprint，替代原 mycar_bringup 节点的 TF 广播
+        publish_tf: true
+
+# 调试期显式打开：默认 false 时「协方差为零/为负」「IMU 被忽略」等 WARN 不会发布到 /diagnostics
+        print_diagnostics: true
+
+# 1. Set the map_frame, odom_frame, and base_link frames to the appropriate frame names for your system.
+#     1a. If your system does not have a map_frame, just remove it, and make sure "world_frame" is set to the value of odom_frame.
+# 2. If you are fusing continuous position data such as wheel encoder odometry, visual odometry, or IMU data, set "world_frame"
+#    to your odom_frame value. This is the default behavior for robot_localization's state estimation nodes.
+# 3. If you are fusing global absolute position data that is subject to discrete jumps (e.g., GPS or position updates from landmark
+#    observations) then:
+#     3a. Set your "world_frame" to your map_frame value
+#     3b. MAKE SURE something else is generating the odom->base_link transform. Note that this can even be another state estimation node
+#         from robot_localization! However, that instance should *not* fuse the global data.
+        map_frame: map                   # Defaults to "map" if unspecified
+        odom_frame: odom                 # Defaults to "odom" if unspecified
+        base_link_frame: base_footprint  # 与优化项 2 统一（URDF 已定义 base_footprint -> base_link）
+        world_frame: odom                # Defaults to the value ofodom_frame if unspecified
+
+# 15 位向量顺序（robot_localization 固定）：
+# x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw, ax, ay, az
+        odom0: /odom
+# 只融 x、y、yaw：关 z（无高度观测）；关 vyaw（让给更准的陀螺，避免同源重复计数）
+        odom0_config: [true,  true,  false,
+                       false, false, true,
+                       false, false, false,
+                       false, false, false,
+                       false, false, false]
+
+        imu0: /imu
+# 只融 roll、pitch（加速度计校正后的姿态）与 vyaw（陀螺短期精确的偏航角速度）；
+# yaw 为纯陀螺积分、无磁力计，长时间漂移，不能当绝对观测量；ax/ay/az 未去重力，暂不融。
+        imu0_config:  [false, false, false,
+                       true,  true,  false,
+                       false, false, false,
+                       false, false, true,
+                       false, false, false]
+
+# 雷达里程计（rf2o，经 relay 补协方差后发布）：提供独立的位置与航向观测，打滑时修正编码器
+        odom1: /odom_laser_fused
+# 只融 x、y、yaw：z/roll/pitch 由 two_d_mode 约束；vyaw 让给更准的 IMU 陀螺，避免同源重复；
+# vx/vy 保守起步（rf2o 速度质量一般），暂不融。
+        odom1_config: [true,  true,  false,
+                       false, false, true,
+                       false, false, false,
+                       false, false, false,
+                       false, false, false]
+# relative=true：只取增量位姿，避免与 odom0 两路绝对位姿互相拉扯导致 EKF 振荡
+        odom1_differential: false
+        odom1_relative: true
+        odom1_queue_size: 10
