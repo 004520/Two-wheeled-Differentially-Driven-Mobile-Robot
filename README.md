@@ -111,3 +111,55 @@ ros2 launch mycar_navigation2 navigation2.launch.py # Nav2 导航
 
 - 障碍物 / 检测结果：接 `web_video_server`，在浏览器查看视频流与标注。
 - TF 与位姿：RViz 加载 `mycar_navigation2` 提供的自动配置。
+
+## 硬件接线 / 引脚定义
+
+> 以下 GPIO 均取自固件源码（`firmware/leap_ros_mcu_driver/main/platform/board.cpp` 及各驱动组件），与板级实际焊接一致。
+
+### ESP32-S3 底盘主控板（`firmware/leap_ros_mcu_driver`）
+
+| 外设 | 接口 | 引脚 |
+|------|------|------|
+| 左电机（AT8236） | IN1 / IN2 | GPIO46 / GPIO9 |
+| 右电机（AT8236） | IN1 / IN2 | GPIO16 / GPIO15 |
+| 左编码器（PCNT 四倍频） | A / B | GPIO10 / GPIO11 |
+| 右编码器（PCNT 四倍频） | A / B | GPIO17 / GPIO18 |
+| IMU（LSM6DS3） | I2C_NUM_0 SDA / SCL | GPIO12 / GPIO13 |
+| 超声波（HC-SR04） | TRIG / ECHO | GPIO21 / GPIO47 |
+| 状态灯 | GPIO | GPIO14 |
+| 舵机 | GPIO | GPIO48 |
+| 电池采样（ADC_UNIT_1, CH2） | ADC | GPIO3 |
+| BOOT / IO0 按键（长按清 WiFi） | GPIO | GPIO0（strapping 脚，谨慎使用） |
+| 雷达（Camsense，UART_NUM_1, 115200） | RX（仅接收） | GPIO41（TX 未接） |
+| MAVLink（UART_NUM_0, 115200） | TX / RX | GPIO43 / GPIO44 |
+
+### ESP32-CAM 相机板（`firmware/leap_cam`）
+
+| 信号 | 引脚 | 信号 | 引脚 |
+|------|------|------|------|
+| D0 / D1 / D2 / D3 | 11 / 9 / 8 / 10 | D4 / D5 / D6 / D7 | 12 / 18 / 17 / 16 |
+| VSYNC / HREF / PCLK | 6 / 7 / 13 | XCLK | 15 |
+| SIOD（SCCB） / SIOC | 4 / 5 | RESET / PWDN | 未用（-1） |
+| 与主控通信（I2C slave） | I2C_NUM_0 | BOOT 按键 / WiFi LED | GPIO0 / GPIO2 |
+
+## 参数文件速查
+
+ROS 2 侧主要参数文件：
+
+| 功能 | 文件 |
+|------|------|
+| EKF 定位 | `ros_ws/src/mycar_navigation2/config/ekf.yaml` |
+| slam_toolbox 建图 | `ros_ws/src/mycar_navigation2/config/slam_toolbox.yaml` |
+| Nav2 导航（主参数） | `ros_ws/src/mycar_navigation2/param/mycarbot.yaml`、`mycarbot_real.yaml`、`nav2.yaml` |
+| 雷达驱动 | `ros_ws/src/camsense_lidar/params/camsense_lidar.yaml` |
+| GMapping 建图 | `ros_ws/src/slam_gmapping/params/slam_gmapping.yaml` |
+| 相机 / 视频流 | `ros_ws/src/mycar_camera/config/http_video_publisher.yaml` |
+| MAVLink 网桥 | `ros_ws/src/mycar_mavlink_bridge/config/mavlink_bridge.yaml` |
+| 视觉检测 / 融合 / 避障 | `ros_ws/src/mycar_vision/config/vision_detector.yaml`、`vision_radar_fusion.yaml`、`avoidance_decider.yaml`、`vision_to_costmap.yaml`、`vision_web_stream.yaml` |
+| 离线地图 | `ros_ws/src/mycar_navigation2/maps/*.yaml` |
+
+**关键参数速记**：
+- 轮距 `kTrackWidth = 131.7 mm`（源码 `main/control/motion_controller.cpp`）。
+- EKF：`two_d_mode: true`、`world_frame: odom`，输出 50 Hz `/odometry/filtered`。
+- 雷达：Camsense 单线 910 Hz；MCU 侧以 115200 波特经 UART 解析。
+- 速度 PID：支持运行中通过 ROS 服务动态修改 / 读取。
