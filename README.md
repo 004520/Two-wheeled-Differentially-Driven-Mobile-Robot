@@ -23,18 +23,18 @@
 
 ## 仓库结构
 
-本仓库由两个工作区组成：
+本仓库整合了下位机固件、上位机 ROS 2 源码与调试工具：
 
 ```
-leap_demo/
-  leap_ros_mcu_driver/   # ESP32-S3 固件：FreeRTOS 任务 + 外设驱动 + micro-ROS
-  leap_cam/              # ESP32-CAM 相机固件
-mycar_ws/
-  src/                   # ROS 2 功能包（mycar_*）
-  tools/                 # 调试脚本与开发文档（验收报告 / 融合修复记录等）
+firmware/
+  leap_ros_mcu_driver/   # ESP32-S3 主控固件：FreeRTOS 任务 + 外设驱动 + micro-ROS
+  leap_cam/              # ESP32-CAM 相机固件（WiFi 图传 / MJPEG）
+ros_ws/
+  src/                   # ROS 2 功能包（mycar_*）与第三方包（slam_gmapping 等）
+tools/                   # 调试脚本与开发文档（验收报告 / 融合修复记录等）
 ```
 
-> 注：ROS 功能包原名 `xuegecar_*` / `xuegeros_demo`，已统一重命名为 `mycar_*`，参数文件 `xuegebot.yaml` → `mycarbot.yaml`，工作区 `xuegeros_ws` → `mycar_ws`。
+> 注：ROS 功能包原名 `xuegecar_*` / `xuegeros_demo`，已统一重命名为 `mycar_*`；`managed_components/`（ESP-IDF 拉取的 micro_ros 等依赖）按惯例不入库，首次编译需 `idf.py reconfigure` 重新拉取。
 
 ### 主要 ROS 功能包
 
@@ -53,16 +53,26 @@ mycar_ws/
 
 ### 下位机（ESP32-S3 固件）
 
+依赖 ESP-IDF v5.x。仓库已忽略 `managed_components/`，首次编译会自动拉取 micro_ROS 等依赖：
+
 ```bash
-cd leap_demo/leap_ros_mcu_driver
+cd firmware/leap_ros_mcu_driver
+idf.py set-target esp32s3      # 首次会触发 reconfigure，拉取 managed_components
+idf.py build flash monitor
+```
+
+相机固件同理：
+
+```bash
+cd firmware/leap_cam
 idf.py set-target esp32s3
 idf.py build flash monitor
 ```
 
-### 上位机（ROS 2）
+### 上位机（ROS 2 Humble）
 
 ```bash
-cd mycar_ws
+cd ros_ws
 colcon build --symlink-install
 source install/setup.bash
 ```
@@ -81,3 +91,23 @@ source install/setup.bash
 ros2 launch mycar_bringup bringup_all.launch.py   # 建图/定位链路
 ros2 launch mycar_navigation2 navigation2.launch.py   # 导航
 ```
+
+## 使用 / 运行
+
+### 1. 下位机 WiFi 与 Agent 配置
+
+- 相机固件首次使用需配置 WiFi：`python firmware/leap_cam/set_wifi.py`（或板上 Web 配网 `web_config`）。
+- 主控通过 micro-ROS Agent 与上位机通信，Agent IP 等参数经 NVS 持久化。
+
+### 2. 上位机启动链路
+
+```bash
+cd ros_ws && source install/setup.bash
+ros2 launch mycar_bringup bringup_all.launch.py     # micro-ROS Agent + 雷达 + URDF + EKF 建图/定位链路
+ros2 launch mycar_navigation2 navigation2.launch.py # Nav2 导航
+```
+
+### 3. 实时可视化
+
+- 障碍物 / 检测结果：接 `web_video_server`，在浏览器查看视频流与标注。
+- TF 与位姿：RViz 加载 `mycar_navigation2` 提供的自动配置。
